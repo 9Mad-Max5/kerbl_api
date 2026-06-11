@@ -120,6 +120,10 @@ class KerblClient:
     # DEVICE ENDPOINTS
     # ---------------------------
 
+    def list_devices(self) -> Dict[str, Any]:
+        """List all devices"""
+        return self.request("GET", "/device")
+
     def get_device(self, device_id: str) -> Dict[str, Any]:
         """Get device by ID"""
         return self.request("GET", f"/device/{device_id}")
@@ -432,9 +436,19 @@ if __name__ == "__main__":
     client.login()
     print("✓ Logged in")
 
-    # Get device
-    # device = client.get_device("DEVICE_ID")
-    # print(f"Device: {device}")
+    # List all devices
+    devices = client.list_devices()
+    print(f"Available devices: {devices}")
+    # Output example:
+    # {
+    #     "devices": [
+    #         {"id": "coop-123", "name": "Coop 1", "type": "smart-coop"},
+    #         {"id": "energizer-456", "name": "Energizer 1", "type": "smart-energizer"},
+    #     ]
+    # }
+    
+    # Get specific device by ID
+    # device = client.get_device("coop-123")
 
     # Get coop info
     # coop = client.get_coop("COOP_ID")
