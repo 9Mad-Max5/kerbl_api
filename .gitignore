@@ -87,3 +87,4 @@ tmp/
 *.db
 *.sqlite
 *.sqlite3
+test_api.py

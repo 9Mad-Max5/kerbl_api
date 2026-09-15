@@ -1,6 +1,6 @@
 import requests
 import time
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, List
 from urllib.parse import urlencode
 
 
@@ -10,6 +10,18 @@ class KerblClient:
     DEV_URL = "https://backend.dev.kerbl-iot.com"
     API_VERSION = "/api/v0.1"
     WS_VERSION = "/ws/v0.1/socket.io"
+    DEVICE_TYPE_PATHS = {
+        "smartcoop": "smart-coop",
+        "smartenergizer": "smart-energizer",
+        "smartsatellite": "smart-satellite",
+        "smartweather": "weather-station",
+        "smarttracker": "smart-tracker",
+        "smartmousetrap": "smart-mousetrap",
+        "smartsos": "smart-sos",
+        "smartlight": "smart-light",
+        "smartchickendoor": "smart-chickendoor",
+        "smartratgun": "smart-rat-gun",
+    }
 
     def __init__(
         self,
@@ -124,9 +136,71 @@ class KerblClient:
         """List all devices"""
         return self.request("GET", "/device")
 
-    def get_device(self, device_id: str) -> Dict[str, Any]:
-        """Get device by ID"""
-        return self.request("GET", f"/device/{device_id}")
+    def find_devices(
+        self,
+        name: str,
+        device_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Find devices by description/name and optionally by API type."""
+        devices = self.list_devices()
+        normalized_name = name.strip().casefold()
+        normalized_type = device_type.replace("-", "").casefold() if device_type else None
+        matches = []
+
+        for api_type, device_list in devices.items():
+            if not isinstance(device_list, list):
+                continue
+            if normalized_type and api_type.replace("-", "").casefold() != normalized_type:
+                continue
+            for device in device_list:
+                device_name = str(device.get("description") or device.get("name") or "")
+                if device_name.strip().casefold() == normalized_name:
+                    matches.append(device)
+
+        return matches
+
+    def get_device_by_name(
+        self,
+        name: str,
+        device_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Find exactly one device by name, optionally restricted by type.
+        Supported device types are:
+        - smart-coop / smartCoop
+        - smart-energizer / smartEnergizer
+        - smart-satellite / smartSatellite
+        - smart-weather / smartWeather
+        - smart-tracker / smartTracker
+        - smart-mousetrap / smartMouseTrap
+        - smart-sos / smartSos
+        - smart-light / smartLight
+        - smart-chickendoor / smartChickenDoor
+        - smart-rat-gun / smartRatGun
+
+        The API may also return mgmtUnitPasture and smartAds from
+        list_devices(); these are not regular /device/{type}/{id} devices.
+        """
+        matches = self.find_devices(name, device_type)
+        if not matches:
+            raise LookupError(f"No device found with name {name!r}")
+        if len(matches) > 1:
+            raise LookupError(
+                f"Multiple devices found with name {name!r}; specify device_type"
+            )
+
+        device = matches[0]
+        resolved_type = next(
+            api_type
+            for api_type, device_list in self.list_devices().items()
+            if device in device_list
+        )
+        return self.get_device(resolved_type, device["id"])
+
+    def get_device(self, device_type: str, device_id: str) -> Dict[str, Any]:
+        """Get a device by its API type and ID."""
+        normalized_type = device_type.replace("-", "").casefold()
+        path_type = self.DEVICE_TYPE_PATHS.get(normalized_type, device_type)
+        return self.request("GET", f"/device/{path_type}/{device_id}")
 
     def get_device_demo(self, device_id: str) -> Dict[str, Any]:
         """Get device demo mode"""
@@ -137,8 +211,8 @@ class KerblClient:
     # ---------------------------
 
     def get_coop(self, coop_id: str) -> Dict[str, Any]:
-        """Get smart coop device"""
-        return self.get_device(coop_id)
+        """Get smart coop device by using the ID"""
+        return self.get_device("smart-coop", coop_id)
 
     def get_coop_log(self, coop_id: str) -> Dict[str, Any]:
         """Get coop event log"""
@@ -232,7 +306,7 @@ class KerblClient:
 
     def get_energizer(self, energizer_id: str) -> Dict[str, Any]:
         """Get smart energizer device"""
-        return self.get_device(energizer_id)
+        return self.get_device("smart-energizer", energizer_id)
 
     def get_energizer_events(
         self,
@@ -276,7 +350,7 @@ class KerblClient:
 
     def get_satellite(self, satellite_id: str) -> Dict[str, Any]:
         """Get smart satellite device"""
-        return self.get_device(satellite_id)
+        return self.get_device("smart-satellite", satellite_id)
 
     def get_satellite_events(
         self,
@@ -320,7 +394,7 @@ class KerblClient:
 
     def get_chickendoor(self, chickendoor_id: str) -> Dict[str, Any]:
         """Get smart chickendoor device"""
-        return self.get_device(chickendoor_id)
+        return self.get_device("smart-chickendoor", chickendoor_id)
 
     def get_chickendoor_events(
         self,
@@ -418,67 +492,3 @@ class KerblClient:
         """Get deployed branch info"""
         return self.request("GET", "/maintenance/deployed_branch")
 
-
-# ---------------------------
-# EXAMPLE USAGE
-# ---------------------------
-
-if __name__ == "__main__":
-    from credentials import mail, password
-    
-    client = KerblClient(
-        email=mail,
-        password=password,
-        base_url=KerblClient.PROD_URL,
-    )
-
-    # Login
-    client.login()
-    print("✓ Logged in")
-
-    # List all devices
-    devices = client.list_devices()
-    print(f"Available devices: {devices}")
-    # Output example:
-    # {
-    #     "devices": [
-    #         {"id": "coop-123", "name": "Coop 1", "type": "smart-coop"},
-    #         {"id": "energizer-456", "name": "Energizer 1", "type": "smart-energizer"},
-    #     ]
-    # }
-    
-    # Get specific device by ID
-    # device = client.get_device("coop-123")
-
-    # Get coop info
-    # coop = client.get_coop("COOP_ID")
-    # print(f"Coop: {coop}")
-
-    # Get coop log
-    # log = client.get_coop_log("COOP_ID")
-    # print(f"Log: {log}")
-
-    # Get coop events with time range
-    # events = client.get_coop_events(
-    #     "COOP_ID",
-    #     from_time="2024-01-01T00:00:00Z",
-    #     to_time="2024-01-02T00:00:00Z",
-    # )
-    # print(f"Events: {events}")
-
-    # Send command to coop
-    # result = client.send_coop_command("COOP_ID", "openDoor")
-    # print(f"Command result: {result}")
-
-    # Get continuous values (temperature, etc.)
-    # values = client.get_coop_continuous_values(
-    #     "COOP_ID",
-    #     "AIR_TEMPERATURE",
-    #     from_time="2024-01-01T00:00:00Z",
-    #     to_time="2024-01-02T00:00:00Z",
-    # )
-    # print(f"Values: {values}")
-
-    # Maintenance ping
-    # ping = client.ping()
-    # print(f"Ping: {ping}")
