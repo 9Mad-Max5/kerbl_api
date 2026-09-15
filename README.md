@@ -1,43 +1,24 @@
 # Kerbl API Client
 
-Ein kleiner Python-Client für die Kerbl-IoT-Backend-API. Der Client übernimmt die Anmeldung, Token-Erneuerung und den Zugriff auf Geräte, Events, Messwerte und Gerätebefehle.
+Python-Client für die Kerbl-IoT-API. Der Client verwendet das Kerbl-Backend für die Anmeldung und den Zugriff auf Geräte, Events, Messwerte und Gerätebefehle.
 
-> **Hinweis:** Dieses Projekt ist ein inoffizieller Client. Die verwendeten Endpoints wurden aus der Kerbl-Anwendung abgeleitet und können sich ohne Vorankündigung ändern.
-
-## Funktionen
-
-- Anmeldung mit E-Mail und Passwort
-- Automatische Erneuerung des Access-Tokens
-- Produktions- und Development-Backend
-- Geräte über Namen und optionalen Gerätetyp finden
-- Smart Coop, Smart Energizer, Smart Satellite und weitere Gerätetypen
-- Events mit Zeit-, Level- und Bestätigungsfiltern
-- Kontinuierliche Messwerte abrufen
-- Gerätebefehle und Parameter setzen
-- Maintenance-Endpunkte wie Ping und Branch-Information
+Das Projekt ist ein inoffizieller Client. Die API-Endpunkte wurden aus der Kerbl-Anwendung abgeleitet und können sich ändern.
 
 ## Voraussetzungen
 
-- Python 3.10 oder neuer
+- Python
 - Ein Kerbl-IoT-Konto
 - Zugriff auf das Kerbl-Backend
 
 ## Installation
 
-Repository klonen und in das Projektverzeichnis wechseln:
-
 ```bash
 git clone <DEINE-GITHUB-URL>
 cd kerbl_api
-```
-
-Abhängigkeit installieren:
-
-```bash
 python -m pip install requests
 ```
 
-Optional empfiehlt sich eine virtuelle Umgebung:
+Optional kann eine virtuelle Umgebung verwendet werden:
 
 ```bash
 python -m venv .venv
@@ -57,20 +38,22 @@ source .venv/bin/activate
 python -m pip install requests
 ```
 
-## Zugangsdaten konfigurieren
+## Zugangsdaten
 
-Die Datei `credentials.py` wird durch `.gitignore` vom Repository ausgeschlossen. Lege sie lokal im Projektverzeichnis an:
+Im Repository liegt [credentials_example.py](credentials_example.py) als Vorlage:
 
 ```python
-mail = "deine-email@example.com"
-password = "dein-passwort"
+mail = "your-email@example.com"
+password = "your-password"
 ```
 
-**Wichtig:** Zugangsdaten niemals committen oder öffentlich auf GitHub hochladen. Prüfen kannst du das mit:
+Die Vorlage lokal kopieren:
 
-```bash
-git status --ignored
+```powershell
+Copy-Item credentials_example.py credentials.py
 ```
+
+Danach die Platzhalter in `credentials.py` durch die eigenen Kerbl-Zugangsdaten ersetzen. Die Datei `credentials.py` ist in `.gitignore` eingetragen und darf nicht veröffentlicht werden.
 
 ## Schnellstart
 
@@ -84,16 +67,22 @@ client = KerblClient(
 )
 
 client.login()
-print("Erfolgreich angemeldet")
-
-# Alle Geräte und Gerätetypen abrufen
 devices = client.list_devices()
-print(devices.keys())
+print(devices)
 ```
 
-## Gerät über Namen finden
+## Geräte finden
 
-`get_device_by_name` sucht in den von `list_devices()` gelieferten Listen. Der Anzeigename wird gegen `description` beziehungsweise `name` geprüft. Der Gerätetyp ist optional, aber empfehlenswert, wenn Namen mehrfach vorkommen können.
+Die API liefert Geräte gruppiert nach Typ. Mit `find_devices` kann nach dem Anzeigenamen gesucht werden:
+
+```python
+matches = client.find_devices("Hühnerstall")
+
+for device in matches:
+    print(device["id"], device.get("description"))
+```
+
+Der Typ kann zusätzlich angegeben werden:
 
 ```python
 coop = client.get_device_by_name(
@@ -101,14 +90,14 @@ coop = client.get_device_by_name(
     device_type="smart-coop",
 )
 
-print("ID:", coop["id"])
-print("Name:", coop.get("description"))
-print("Online:", coop.get("isOnline"))
+print(coop["id"])
+print(coop.get("description"))
+print(coop.get("isOnline"))
 ```
 
-Folgende Schreibweisen werden akzeptiert:
+Unterstützte Typbezeichnungen für die Namenssuche sind:
 
-| Typ für `get_device_by_name` | API-Kategorie |
+| Schreibweise | Gerät |
 | --- | --- |
 | `smart-coop` oder `smartCoop` | Smart Coop |
 | `smart-energizer` oder `smartEnergizer` | Smart Energizer |
@@ -121,97 +110,60 @@ Folgende Schreibweisen werden akzeptiert:
 | `smart-chickendoor` oder `smartChickenDoor` | Smart Chickendoor |
 | `smart-rat-gun` oder `smartRatGun` | Smart Rat Gun |
 
-Nur suchen, ohne direkt die Detaildaten abzurufen:
+Für eine Detailabfrage benötigt `get_device` den Typ und die ID:
 
 ```python
-matches = client.find_devices("Hühnerstall")
-
-for device in matches:
-    print(device["id"], device.get("description"))
-```
-
-Bei keinem Treffer oder mehreren Treffern wirft `get_device_by_name` einen `LookupError`. In diesem Fall den Namen prüfen oder den Gerätetyp angeben.
-
-## Gerät direkt über ID abrufen
-
-Für Detailabfragen benötigt die API sowohl den Typ als auch die ID:
-
-```python
-coop = client.get_coop("DEINE_COOP_ID")
-
-# Allgemein:
 device = client.get_device(
     device_type="smart-coop",
-    device_id="DEINE_COOP_ID",
+    device_id=coop["id"],
 )
 ```
 
-Ein Aufruf wie `get_device("DEINE_ID")` reicht nicht aus, da der API-Pfad typbezogen ist.
-
-## Smart Coop
+Für Smart Coop gibt es außerdem:
 
 ```python
 coop_id = coop["id"]
 
-# Aktuelle Gerätedaten
-coop = client.get_coop(coop_id)
-
-# Ereignisprotokoll
+details = client.get_coop(coop_id)
 log = client.get_coop_log(coop_id)
-
-# Ereignisse mit Zeitraum
-from datetime import datetime, timezone
-
-start = datetime(2026, 1, 1, tzinfo=timezone.utc).isoformat()
-end = datetime(2026, 1, 2, tzinfo=timezone.utc).isoformat()
-events = client.get_coop_events(
-    coop_id,
-    from_time=start,
-    to_time=end,
-)
-
-# Befehl senden
-result = client.send_coop_command(
-    coop_id,
-    "openDoor",
-)
-
-# Kontinuierliche Werte abrufen
+events = client.get_coop_events(coop_id)
 values = client.get_coop_continuous_values(
     coop_id,
     "AIR_TEMPERATURE",
-    from_time=start,
-    to_time=end,
 )
 ```
 
-Schreibbefehle wie `send_coop_command`, `set_coop_parameter` oder `reset_coop_desired_state` verändern den Gerätezustand. Verwende sie zunächst nur mit einem Testgerät und prüfe die verfügbaren Befehlsnamen für deine Firmware.
+## Schreibzugriffe
 
-## Weitere Gerätetypen
-
-Für unterstützte Gerätetypen stehen typbezogene Methoden zur Verfügung:
+Der Client kann auch Befehle und Parameter an Geräte senden:
 
 ```python
-energizer = client.get_energizer("ENERGIZER_ID")
-satellite = client.get_satellite("SATELLITE_ID")
-chickendoor = client.get_chickendoor("CHICKENDOOR_ID")
+result = client.send_coop_command(
+    coop["id"],
+    "openDoor",
+)
 ```
 
-Zusätzlich gibt es unter anderem:
+Weitere vorhandene Methoden für Smart Coop sind unter anderem `set_coop_parameter`, `refresh_coop` und `reset_coop_desired_state`. Diese Methoden können den Gerätezustand verändern. Die verfügbaren Befehle können von Gerät und Firmware abhängen.
 
-- `get_energizer_events`
-- `send_energizer_command`
-- `get_satellite_events`
-- `send_satellite_command`
-- `get_chickendoor_events`
-- `send_chickendoor_command`
-- `get_chickendoor_pending_commands`
-- `get_smart_tracker_continuous_values`
-- `get_continuous_values`
+## Weitere vorhandene Methoden
+
+Der Client enthält außerdem Methoden für:
+
+- Smart Energizer
+- Smart Satellite
+- Smart Chickendoor
+- Smart Tracker
+- allgemeine kontinuierliche Messwerte
+- Benutzerprofil und Prepaid-Guthaben
+- Passwort- und E-Mail-Funktionen
+- Maintenance-Ping und Deployment-Informationen
+
+Die konkreten Methoden befinden sich in [kerbl_api.py](kerbl_api.py).
 
 ## Development-Backend
 
-Für das Development-Backend kann die URL explizit gesetzt werden:
+Das Development-Backend kann beim Erstellen des Clients verwendet werden:
 
 ```python
 client = KerblClient(
@@ -230,31 +182,32 @@ Syntaxprüfung:
 python -m py_compile kerbl_api.py
 ```
 
-Das mitgelieferte Beispiel ausführen:
+Das vorhandene Beispielprogramm ausführen:
 
 ```bash
 python test_api.py
 ```
 
-Das Beispiel benötigt eine lokale `credentials.py` und führt echte API-Aufrufe aus. Es sollte daher nur in einer Umgebung mit passenden Zugangsdaten ausgeführt werden.
+`test_api.py` verwendet `credentials.py` und führt echte API-Aufrufe aus. Vor dem Start müssen deshalb lokale Zugangsdaten eingerichtet sein.
 
-## Projektstruktur
+## Dateien
 
 ```text
 kerbl_api/
-├── kerbl_api.py       # KerblClient und API-Methoden
-├── credentials.py     # Lokale Zugangsdaten, nicht versionieren
+├── kerbl_api.py            # KerblClient und API-Methoden
+├── credentials_example.py  # Vorlage ohne echte Zugangsdaten
+├── credentials.py          # Lokale Zugangsdaten, nicht veröffentlichen
 ├── .gitignore
 └── README.md
 ```
 
 ## Sicherheit
 
-- `credentials.py`, `.env` und lokale Logs sind in `.gitignore` eingetragen.
+- Keine echten Zugangsdaten in Git committen.
+- `credentials.py` niemals auf GitHub veröffentlichen.
 - Keine Access- oder Refresh-Tokens in Logs ausgeben.
-- Keine Zugangsdaten in Issues, Screenshots oder Beispielen veröffentlichen.
-- Bei versehentlich veröffentlichten Zugangsdaten das Passwort sofort ändern.
+- Bei versehentlich veröffentlichten Zugangsdaten das Passwort ändern.
 
 ## Lizenz
 
-Es ist aktuell keine Lizenz festgelegt. Wenn du das Projekt öffentlich weitergeben möchtest, ergänze eine passende Lizenzdatei, zum Beispiel MIT.
+Für dieses Projekt ist derzeit keine Lizenz festgelegt.
