@@ -243,9 +243,6 @@ Das Beispiel benötigt eine lokale `credentials.py` und führt echte API-Aufrufe
 ```text
 kerbl_api/
 ├── kerbl_api.py       # KerblClient und API-Methoden
-├── test_api.py        # Beispiel für reale API-Aufrufe
-├── api_search.py      # Sucht API-Pfade in main.js
-├── main.js            # Lokale API-Referenz
 ├── credentials.py     # Lokale Zugangsdaten, nicht versionieren
 ├── .gitignore
 └── README.md

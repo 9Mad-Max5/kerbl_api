@@ -88,3 +88,6 @@ tmp/
 *.sqlite
 *.sqlite3
 test_api.py
+.gitignore
+main.js
+api_search.py
